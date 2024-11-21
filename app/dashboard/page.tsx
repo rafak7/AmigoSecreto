@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GiftIcon, PlusCircle, Users, Calendar, DollarSign, UserPlus, BellRing } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { CreateGroupModal } from "@/components/create-group-modal";
 import { InviteParticipantsModal } from "@/components/invite-participants-modal";
 import { format } from "date-fns";
@@ -43,6 +43,67 @@ export default function Dashboard() {
     }
   }, [user, router]);
 
+  // Carregar grupos do localStorage quando o componente montar
+  useEffect(() => {
+    const loadGroups = () => {
+      console.log('Carregando grupos...');
+      const storedGroups = localStorage.getItem('groups');
+      console.log('Grupos armazenados (raw):', storedGroups);
+      
+      if (storedGroups) {
+        try {
+          const parsedGroups = JSON.parse(storedGroups);
+          console.log('Grupos parseados:', parsedGroups);
+          setGroups(parsedGroups);
+          
+          // Se há um grupo selecionado, atualize-o com os dados mais recentes
+          if (selectedGroup) {
+            const updatedSelectedGroup = parsedGroups.find(g => g.id === selectedGroup.id);
+            console.log('Grupo selecionado atualizado:', updatedSelectedGroup);
+            if (updatedSelectedGroup) {
+              setSelectedGroup(updatedSelectedGroup);
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao carregar grupos:', error);
+        }
+      } else {
+        console.log('Nenhum grupo encontrado no localStorage');
+        setGroups([]);
+      }
+    };
+
+    // Carrega os grupos inicialmente
+    loadGroups();
+
+    // Adiciona um listener para mudanças no localStorage
+    const handleStorage = (e: StorageEvent) => {
+      console.log('Evento storage detectado:', e);
+      if (e.key === 'groups' && e.newValue !== null) {
+        console.log('Mudança nos grupos detectada');
+        try {
+          const newGroups = JSON.parse(e.newValue);
+          setGroups(newGroups);
+          
+          if (selectedGroup) {
+            const updatedSelectedGroup = newGroups.find(g => g.id === selectedGroup.id);
+            if (updatedSelectedGroup) {
+              setSelectedGroup(updatedSelectedGroup);
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao processar novos grupos:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [selectedGroup]);
+
   const generateInviteCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
@@ -52,19 +113,54 @@ export default function Dashboard() {
   };
 
   const handleCreateGroup = (newGroup: Omit<Group, 'id' | 'inviteCode' | 'invitePassword' | 'participants'>) => {
-    const groupWithId = {
+    const inviteCode = generateInviteCode();
+    const invitePassword = generateInviteCode();
+    const groupWithId: Group = {
       ...newGroup,
       id: Date.now().toString(),
-      inviteCode: generateInviteCode(),
-      invitePassword: generatePassword(),
+      inviteCode,
+      invitePassword,
       participants: [],
     };
-    setGroups(prev => [...prev, groupWithId]);
+    
+    setGroups(prev => {
+      const newGroups = [...prev, groupWithId];
+      // Salva no localStorage quando um novo grupo é criado
+      localStorage.setItem('groups', JSON.stringify(newGroups));
+      return newGroups;
+    });
+
+    // Dispara evento storage para atualizar outras abas
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'groups',
+      newValue: JSON.stringify([...groups, groupWithId]),
+      url: window.location.href
+    }));
   };
 
   const handleManageGroup = (group: Group) => {
+    console.log('Gerenciando grupo:', group);
     setSelectedGroup(group);
     setIsInviteModalOpen(true);
+  };
+
+  const handleUpdateGroup = (updatedGroup: Group) => {
+    console.log('Atualizando grupo:', updatedGroup);
+    setGroups(prev => {
+      const newGroups = prev.map(g => g.id === updatedGroup.id ? updatedGroup : g);
+      // Salva no localStorage quando um grupo é atualizado
+      localStorage.setItem('groups', JSON.stringify(newGroups));
+      console.log('Grupos após atualização:', newGroups);
+      return newGroups;
+    });
+    setSelectedGroup(updatedGroup);
+
+    // Dispara evento storage para atualizar outras abas
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'groups',
+      newValue: JSON.stringify(groups.map(g => g.id === updatedGroup.id ? updatedGroup : g)),
+      url: window.location.href
+    }));
   };
 
   if (!user) {
@@ -203,9 +299,7 @@ export default function Dashboard() {
           open={isInviteModalOpen}
           onOpenChange={setIsInviteModalOpen}
           group={selectedGroup}
-          onUpdateGroup={(updatedGroup) => {
-            setGroups(prev => prev.map(g => g.id === updatedGroup.id ? updatedGroup : g));
-          }}
+          onUpdateGroup={handleUpdateGroup}
         />
       )}
     </main>
