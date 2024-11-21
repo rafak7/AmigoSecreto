@@ -27,6 +27,7 @@ interface Group {
   inviteCode: string;
   invitePassword: string;
   participants: Participant[];
+  ownerId: string;
 }
 
 interface InviteParticipantsModalProps {

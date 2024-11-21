@@ -3,14 +3,15 @@
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { GiftIcon, PlusCircle, Users, Calendar, DollarSign, UserPlus, BellRing } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { CreateGroupModal } from "@/components/create-group-modal";
 import { InviteParticipantsModal } from "@/components/invite-participants-modal";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { SnowAnimation } from "@/components/snow-animation";
+import { useToast } from "@/components/ui/use-toast";
+import { GiftIcon, PlusCircle, Users, Calendar, DollarSign, UserPlus, BellRing } from "lucide-react";
 
 interface Participant {
   id: string;
@@ -27,15 +28,19 @@ interface Group {
   inviteCode: string;
   invitePassword: string;
   participants: Participant[];
+  ownerId: string;
 }
+
+const getUserGroupsKey = (userId: string) => `groups-${userId}`;
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -46,29 +51,60 @@ export default function Dashboard() {
   // Carregar grupos do localStorage quando o componente montar
   useEffect(() => {
     const loadGroups = () => {
-      console.log('Carregando grupos...');
-      const storedGroups = localStorage.getItem('groups');
+      if (!user) {
+        console.log('Usuário não está logado, não carregando grupos');
+        setGroups([]);
+        return;
+      }
+
+      console.log('Carregando grupos para o usuário:', user.id);
+      const key = getUserGroupsKey(user.id);
+      const storedGroups = localStorage.getItem(key);
       console.log('Grupos armazenados (raw):', storedGroups);
       
       if (storedGroups) {
         try {
           const parsedGroups = JSON.parse(storedGroups);
-          console.log('Grupos parseados:', parsedGroups);
-          setGroups(parsedGroups);
           
-          // Se há um grupo selecionado, atualize-o com os dados mais recentes
+          // Validar se o valor parseado é um array
+          if (!Array.isArray(parsedGroups)) {
+            console.error('Dados armazenados não são um array:', parsedGroups);
+            setGroups([]);
+            return;
+          }
+
+          // Validar cada grupo no array
+          const validGroups = parsedGroups.filter(group => {
+            return (
+              group &&
+              typeof group === 'object' &&
+              typeof group.id === 'string' &&
+              typeof group.name === 'string' &&
+              Array.isArray(group.participants) &&
+              group.ownerId === user.id // Garante que só carregamos grupos do usuário atual
+            );
+          });
+
+          console.log('Grupos válidos:', validGroups);
+          setGroups(validGroups);
+          
+          // Atualiza o grupo selecionado se necessário
           if (selectedGroup) {
-            const updatedSelectedGroup = parsedGroups.find(g => g.id === selectedGroup.id);
+            const updatedSelectedGroup = validGroups.find(g => g.id === selectedGroup.id);
             console.log('Grupo selecionado atualizado:', updatedSelectedGroup);
             if (updatedSelectedGroup) {
               setSelectedGroup(updatedSelectedGroup);
+            } else {
+              setSelectedGroup(null); // Limpa a seleção se o grupo não existe mais
             }
           }
         } catch (error) {
           console.error('Erro ao carregar grupos:', error);
+          setGroups([]);
+          setSelectedGroup(null);
         }
       } else {
-        console.log('Nenhum grupo encontrado no localStorage');
+        console.log('Nenhum grupo encontrado para o usuário:', user.id);
         setGroups([]);
       }
     };
@@ -78,22 +114,12 @@ export default function Dashboard() {
 
     // Adiciona um listener para mudanças no localStorage
     const handleStorage = (e: StorageEvent) => {
+      const key = getUserGroupsKey(user?.id || '');
       console.log('Evento storage detectado:', e);
-      if (e.key === 'groups' && e.newValue !== null) {
-        console.log('Mudança nos grupos detectada');
-        try {
-          const newGroups = JSON.parse(e.newValue);
-          setGroups(newGroups);
-          
-          if (selectedGroup) {
-            const updatedSelectedGroup = newGroups.find(g => g.id === selectedGroup.id);
-            if (updatedSelectedGroup) {
-              setSelectedGroup(updatedSelectedGroup);
-            }
-          }
-        } catch (error) {
-          console.error('Erro ao processar novos grupos:', error);
-        }
+      
+      if (e.key === key) {
+        console.log('Mudança detectada nos grupos do usuário atual');
+        loadGroups();
       }
     };
 
@@ -102,7 +128,7 @@ export default function Dashboard() {
     return () => {
       window.removeEventListener('storage', handleStorage);
     };
-  }, [selectedGroup]);
+  }, [user, selectedGroup]);
 
   const generateInviteCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -112,30 +138,68 @@ export default function Dashboard() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
 
-  const handleCreateGroup = (newGroup: Omit<Group, 'id' | 'inviteCode' | 'invitePassword' | 'participants'>) => {
-    const inviteCode = generateInviteCode();
-    const invitePassword = generateInviteCode();
-    const groupWithId: Group = {
-      ...newGroup,
-      id: Date.now().toString(),
-      inviteCode,
-      invitePassword,
-      participants: [],
-    };
-    
-    setGroups(prev => {
-      const newGroups = [...prev, groupWithId];
-      // Salva no localStorage quando um novo grupo é criado
-      localStorage.setItem('groups', JSON.stringify(newGroups));
-      return newGroups;
-    });
+  const handleCreateGroup = (newGroup: Omit<Group, 'id' | 'inviteCode' | 'invitePassword' | 'participants' | 'ownerId'>) => {
+    if (!user) {
+      console.error('Tentativa de criar grupo sem usuário logado');
+      toast({
+        title: "Erro ao criar grupo",
+        description: "Você precisa estar logado para criar um grupo.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // Dispara evento storage para atualizar outras abas
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'groups',
-      newValue: JSON.stringify([...groups, groupWithId]),
-      url: window.location.href
-    }));
+    try {
+      const inviteCode = generateInviteCode();
+      const invitePassword = generateInviteCode();
+      const groupWithId: Group = {
+        ...newGroup,
+        id: Date.now().toString(),
+        inviteCode,
+        invitePassword,
+        participants: [],
+        ownerId: user.id,
+      };
+      
+      console.log('Criando novo grupo:', groupWithId);
+      
+      setGroups(prev => {
+        const newGroups = [...prev, groupWithId];
+        // Salva no localStorage quando um novo grupo é criado
+        try {
+          localStorage.setItem(getUserGroupsKey(user.id), JSON.stringify(newGroups));
+          console.log('Grupo salvo com sucesso no localStorage');
+        } catch (error) {
+          console.error('Erro ao salvar grupo no localStorage:', error);
+          throw error; // Propaga o erro para ser tratado no catch externo
+        }
+        return newGroups;
+      });
+
+      // Dispara evento storage para atualizar outras abas
+      const storageEvent = new StorageEvent('storage', {
+        key: getUserGroupsKey(user.id),
+        newValue: JSON.stringify([...groups, groupWithId]),
+        url: window.location.href
+      });
+      
+      console.log('Disparando evento storage para novo grupo');
+      window.dispatchEvent(storageEvent);
+
+      // Feedback de sucesso
+      toast({
+        title: "Grupo criado",
+        description: "O grupo foi criado com sucesso!",
+      });
+
+    } catch (error) {
+      console.error('Erro ao criar grupo:', error);
+      toast({
+        title: "Erro ao criar grupo",
+        description: "Não foi possível criar o grupo. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleManageGroup = (group: Group) => {
@@ -145,22 +209,71 @@ export default function Dashboard() {
   };
 
   const handleUpdateGroup = (updatedGroup: Group) => {
-    console.log('Atualizando grupo:', updatedGroup);
-    setGroups(prev => {
-      const newGroups = prev.map(g => g.id === updatedGroup.id ? updatedGroup : g);
-      // Salva no localStorage quando um grupo é atualizado
-      localStorage.setItem('groups', JSON.stringify(newGroups));
-      console.log('Grupos após atualização:', newGroups);
-      return newGroups;
-    });
-    setSelectedGroup(updatedGroup);
+    if (!user) {
+      console.error('Tentativa de atualizar grupo sem usuário logado');
+      toast({
+        title: "Erro ao atualizar grupo",
+        description: "Você precisa estar logado para atualizar um grupo.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // Dispara evento storage para atualizar outras abas
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'groups',
-      newValue: JSON.stringify(groups.map(g => g.id === updatedGroup.id ? updatedGroup : g)),
-      url: window.location.href
-    }));
+    // Verifica se o grupo pertence ao usuário atual
+    if (updatedGroup.ownerId !== user.id) {
+      console.error('Tentativa de atualizar grupo de outro usuário');
+      toast({
+        title: "Erro ao atualizar grupo",
+        description: "Você não tem permissão para atualizar este grupo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      console.log('Atualizando grupo:', updatedGroup);
+      
+      setGroups(prev => {
+        const newGroups = prev.map(g => g.id === updatedGroup.id ? updatedGroup : g);
+        
+        try {
+          // Salva no localStorage quando um grupo é atualizado
+          localStorage.setItem(getUserGroupsKey(user.id), JSON.stringify(newGroups));
+          console.log('Grupos após atualização:', newGroups);
+        } catch (error) {
+          console.error('Erro ao salvar no localStorage:', error);
+          throw error; // Propaga o erro para ser tratado no catch externo
+        }
+        
+        return newGroups;
+      });
+
+      setSelectedGroup(updatedGroup);
+
+      // Notifica outras abas
+      const storageEvent = new StorageEvent('storage', {
+        key: getUserGroupsKey(user.id),
+        newValue: JSON.stringify(groups.map(g => g.id === updatedGroup.id ? updatedGroup : g)),
+        url: window.location.href
+      });
+      
+      console.log('Disparando evento storage para atualização');
+      window.dispatchEvent(storageEvent);
+
+      // Feedback de sucesso
+      toast({
+        title: "Grupo atualizado",
+        description: "As alterações foram salvas com sucesso.",
+      });
+
+    } catch (error) {
+      console.error('Erro ao atualizar grupo:', error);
+      toast({
+        title: "Erro ao atualizar grupo",
+        description: "Não foi possível salvar as alterações. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (!user) {
