@@ -343,39 +343,45 @@ export default function Dashboard() {
               </h3>
               <span className="text-sm text-gray-400">{groups.length} grupo(s)</span>
             </div>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-3">
               {groups.map((group) => (
-                <Card key={group.id} className="christmas-card p-6 hover:shadow-xl transition-all duration-300">
-                  <div className="flex justify-between items-start mb-4">
-                    <h4 className="text-lg font-semibold">{group.name}</h4>
-                    <span className="px-2 py-1 bg-green-500/10 text-green-400 text-xs rounded-full">
+                <Card key={group.id} className="christmas-card p-3 hover:shadow-xl transition-all duration-300">
+                  <div className="flex justify-between items-start gap-2 mb-2">
+                    <h4 className="text-sm font-medium truncate flex-1">{group.name}</h4>
+                    <span className="px-1.5 py-0.5 bg-green-500/10 text-green-400 text-[10px] rounded-full shrink-0">
                       Ativo
                     </span>
                   </div>
-                  <p className="text-sm text-gray-400 mb-6">{group.description}</p>
-                  <div className="space-y-3 mb-6">
-                    <div className="flex items-center text-sm text-gray-300">
-                      <Calendar className="w-4 h-4 mr-2 text-red-400" />
-                      {format(group.date, "PPP", { locale: ptBR })}
+                  <p className="text-[10px] text-gray-400 mb-2 line-clamp-1">{group.description}</p>
+                  <div className="space-y-1 mb-2">
+                    <div className="flex items-center text-[10px] text-gray-300">
+                      <Calendar className="w-3 h-3 mr-1 text-red-400 shrink-0" />
+                      <span className="truncate">
+                        {format(group.date, "dd MMM yyyy", { locale: ptBR })}
+                      </span>
                     </div>
-                    <div className="flex items-center text-sm text-gray-300">
-                      <DollarSign className="w-4 h-4 mr-2 text-green-400" />
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      }).format(group.priceRange)}
+                    <div className="flex items-center text-[10px] text-gray-300">
+                      <DollarSign className="w-3 h-3 mr-1 text-green-400 shrink-0" />
+                      <span className="truncate">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL'
+                        }).format(group.priceRange)}
+                      </span>
                     </div>
-                    <div className="flex items-center text-sm text-gray-300">
-                      <UserPlus className="w-4 h-4 mr-2 text-blue-400" />
-                      {group.participants.length} participante{group.participants.length !== 1 ? 's' : ''}
+                    <div className="flex items-center text-[10px] text-gray-300">
+                      <UserPlus className="w-3 h-3 mr-1 text-blue-400 shrink-0" />
+                      <span className="truncate">
+                        {group.participants.length} participante{group.participants.length !== 1 ? 's' : ''}
+                      </span>
                     </div>
                   </div>
                   <Button 
                     variant="secondary" 
-                    className="w-full hover:bg-white/10"
+                    className="w-full h-6 text-[10px] hover:bg-white/10 px-2"
                     onClick={() => handleManageGroup(group)}
                   >
-                    Gerenciar Grupo
+                    Gerenciar
                   </Button>
                 </Card>
               ))}

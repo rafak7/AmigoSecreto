@@ -173,114 +173,118 @@ export function InviteParticipantsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Gerenciar Grupo: {group.name}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-lg">Gerenciar: {group.name}</DialogTitle>
+          <DialogDescription className="text-sm">
             Compartilhe o link do grupo ou gerencie os participantes
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="invite" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="mb-4">
-            <TabsTrigger value="invite" className="flex items-center gap-2">
-              <LinkIcon className="h-4 w-4" />
+          <TabsList className="mb-2">
+            <TabsTrigger value="invite" className="flex items-center gap-1 text-sm">
+              <LinkIcon className="h-3 w-3" />
               Convite
             </TabsTrigger>
-            <TabsTrigger value="participants" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
+            <TabsTrigger value="participants" className="flex items-center gap-1 text-sm">
+              <Users className="h-3 w-3" />
               Participantes
             </TabsTrigger>
             {group.drawResult && (
-              <TabsTrigger value="results" className="flex items-center gap-2">
-                <Gift className="h-4 w-4" />
+              <TabsTrigger value="results" className="flex items-center gap-1 text-sm">
+                <Gift className="h-3 w-3" />
                 Resultados
               </TabsTrigger>
             )}
           </TabsList>
 
           <TabsContent value="invite" className="flex-1 mt-0">
-            <div className="space-y-6">
-              <div className="space-y-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Link de convite</label>
+                  <label className="text-xs font-medium mb-1 block">Link de convite</label>
                   <div className="flex items-center space-x-2">
                     <Input
                       readOnly
                       value={inviteLink}
+                      className="h-8 text-sm"
                     />
                     <Button
                       variant="outline"
                       size="icon"
+                      className="h-8 w-8"
                       onClick={() => copyToClipboard(inviteLink)}
                     >
-                      <Copy className="h-4 w-4" />
+                      <Copy className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Compartilhe este link com as pessoas que você quer convidar para o grupo.
+                <p className="text-xs text-muted-foreground">
+                  Compartilhe este link com as pessoas que você quer convidar.
                 </p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Senha do grupo</label>
+                  <label className="text-xs font-medium mb-1 block">Senha do grupo</label>
                   <div className="flex items-center space-x-2">
                     <Input
                       readOnly
                       value={group.invitePassword}
+                      className="h-8 text-sm"
                     />
                     <Button
                       variant="outline"
                       size="icon"
+                      className="h-8 w-8"
                       onClick={() => copyToClipboard(group.invitePassword)}
                     >
-                      <Copy className="h-4 w-4" />
+                      <Copy className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Os participantes precisarão desta senha para entrar no grupo.
+                <p className="text-xs text-muted-foreground">
+                  Os participantes precisarão desta senha para entrar.
                 </p>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="participants" className="flex-1 mt-0 overflow-hidden">
-            <ScrollArea className="h-[400px] pr-4">
+            <ScrollArea className="h-[300px] pr-4">
               <div className="space-y-2">
                 {group.participants.map((participant) => (
                   <div
                     key={participant.id}
                     className="flex flex-col p-2 rounded-md bg-secondary"
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium">{participant.name}</p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm font-medium">{participant.name}</p>
+                            <p className="text-xs text-muted-foreground">
                               {participant.email}
                             </p>
                           </div>
                           <Button 
                             variant="ghost" 
                             size="icon"
-                            className="h-8 w-8 shrink-0"
+                            className="h-6 w-6"
                             onClick={() => toggleParticipant(participant.id)}
                           >
                             {isParticipantExpanded(participant.id) ? (
-                              <ChevronUp className="h-4 w-4" />
+                              <ChevronUp className="h-3 w-3" />
                             ) : (
-                              <ChevronDown className="h-4 w-4" />
+                              <ChevronDown className="h-3 w-3" />
                             )}
                           </Button>
                         </div>
                         {isParticipantExpanded(participant.id) && participant.giftHints && (
-                          <div className="flex gap-2 mt-2">
+                          <div className="flex gap-2 mt-1">
                             <div className="h-4 w-0.5 bg-muted" />
-                            <p className="text-sm text-muted-foreground flex-1">
+                            <p className="text-xs text-muted-foreground flex-1">
                               <span className="font-medium">Dicas:</span> {participant.giftHints}
                             </p>
                           </div>
@@ -290,9 +294,9 @@ export function InviteParticipantsModal({
                   </div>
                 ))}
                 {group.participants.length === 0 && (
-                  <div className="text-center py-8">
-                    <Users className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">
+                  <div className="text-center py-6">
+                    <Users className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-xs text-muted-foreground">
                       Nenhum participante ainda
                     </p>
                   </div>
@@ -303,38 +307,38 @@ export function InviteParticipantsModal({
 
           {group.drawResult && (
             <TabsContent value="results" className="flex-1 mt-0 overflow-hidden">
-              <ScrollArea className="h-[400px] pr-4">
+              <ScrollArea className="h-[300px] pr-4">
                 <div className="space-y-2">
                   {group.drawResult.map((pair, index) => (
                     <div
                       key={index}
                       className="flex flex-col p-2 rounded-md bg-secondary"
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">{pair.giver.name}</p>
-                              <span className="text-sm text-muted-foreground">tirou</span>
-                              <p className="font-medium text-red-500">{pair.receiver.name}</p>
+                            <div className="flex items-center gap-1">
+                              <p className="text-sm font-medium">{pair.giver.name}</p>
+                              <span className="text-xs text-muted-foreground">tirou</span>
+                              <p className="text-sm font-medium text-red-500">{pair.receiver.name}</p>
                             </div>
                             <Button 
                               variant="ghost" 
                               size="icon"
-                              className="h-8 w-8 shrink-0"
+                              className="h-6 w-6"
                               onClick={() => toggleParticipant(`draw-${index}`)}
                             >
                               {isParticipantExpanded(`draw-${index}`) ? (
-                                <ChevronUp className="h-4 w-4" />
+                                <ChevronUp className="h-3 w-3" />
                               ) : (
-                                <ChevronDown className="h-4 w-4" />
+                                <ChevronDown className="h-3 w-3" />
                               )}
                             </Button>
                           </div>
                           {isParticipantExpanded(`draw-${index}`) && pair.receiver.giftHints && (
-                            <div className="flex gap-2 mt-2">
+                            <div className="flex gap-2 mt-1">
                               <div className="h-4 w-0.5 bg-muted" />
-                              <p className="text-sm text-muted-foreground flex-1">
+                              <p className="text-xs text-muted-foreground flex-1">
                                 <span className="font-medium">Dicas:</span> {pair.receiver.giftHints}
                               </p>
                             </div>
@@ -350,7 +354,7 @@ export function InviteParticipantsModal({
         </Tabs>
 
         <Button
-          className="w-full bg-red-500 hover:bg-red-600"
+          className="w-full bg-red-500 hover:bg-red-600 h-8 text-sm mt-2"
           onClick={handleStartDraw}
           disabled={group.drawResult || group.participants.length < 3}
         >
