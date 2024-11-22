@@ -16,6 +16,7 @@ interface Participant {
   id: string;
   name: string;
   email: string;
+  giftHints?: string;
 }
 
 interface Group {
@@ -34,9 +35,12 @@ const joinSchema = z.object({
   name: z.string().min(2, "O nome deve ter no mínimo 2 caracteres"),
   email: z.string().email("Email inválido"),
   password: z.string().min(1, "A senha do grupo é obrigatória"),
+  giftHints: z.string().optional(),
 });
 
 type JoinFormData = z.infer<typeof joinSchema>;
+
+const getUserGroupsKey = (userId: string) => `groups-${userId}`;
 
 export function JoinForm({ code }: { code: string }) {
   const { toast } = useToast();
@@ -48,35 +52,56 @@ export function JoinForm({ code }: { code: string }) {
 
   const onSubmit = async (data: JoinFormData) => {
     try {
-      console.log('Iniciando processo de participação...');
-      console.log('Código do convite:', code);
-      
-      // Recupera os grupos do localStorage
-      const storedGroups = localStorage.getItem('groups');
-      console.log('Grupos armazenados (raw):', storedGroups);
-      
-      if (!storedGroups) {
-        throw new Error("Nenhum grupo encontrado no localStorage");
+      // Verifica se o usuário está logado
+      if (!user) {
+        toast({
+          title: "Erro ao participar",
+          description: "Você precisa estar logado para participar de um grupo. Por favor, faça login primeiro.",
+          variant: "destructive",
+        });
+        router.push('/login');
+        return;
       }
 
-      let groups: Group[];
-      try {
-        groups = JSON.parse(storedGroups);
-        console.log('Grupos parseados:', groups);
-      } catch (error) {
-        console.error('Erro ao fazer parse dos grupos:', error);
-        throw new Error("Erro ao ler os grupos armazenados");
-      }
+      console.log('Tentando participar do grupo com código:', code);
       
+      // Verifica todas as chaves no localStorage
+      console.log('Todas as chaves no localStorage:', Object.keys(localStorage));
+      
+      // Procura por grupos em todas as chaves que começam com 'groups-'
+      const allGroups: Group[] = [];
+      
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('groups-')) {
+          try {
+            const groupsData = localStorage.getItem(key);
+            if (groupsData) {
+              const parsed = JSON.parse(groupsData);
+              if (Array.isArray(parsed)) {
+                allGroups.push(...parsed);
+              }
+            }
+          } catch (error) {
+            console.error(`Erro ao parsear grupos da chave ${key}:`, error);
+          }
+        }
+      });
+      
+      console.log('Todos os grupos encontrados:', allGroups);
+      
+      if (allGroups.length === 0) {
+        throw new Error("Não foi possível encontrar nenhum grupo ativo. O grupo pode ter sido excluído ou você está usando um link inválido. Por favor, peça ao organizador um novo link de convite.");
+      }
+
       // Encontra o grupo com o código de convite
-      const groupIndex = groups.findIndex(g => g.inviteCode === code);
+      const groupIndex = allGroups.findIndex(g => g.inviteCode === code);
       console.log('Índice do grupo encontrado:', groupIndex);
       
       if (groupIndex === -1) {
-        throw new Error("Grupo não encontrado com o código: " + code);
+        throw new Error(`Não foi possível encontrar o grupo com o código ${code}. O grupo pode ter sido excluído ou você está usando um link desatualizado. Por favor, peça ao organizador um novo link de convite.`);
       }
 
-      const group = groups[groupIndex];
+      const group = allGroups[groupIndex];
       console.log('Grupo antes da atualização:', group);
 
       if (group.invitePassword !== data.password) {
@@ -93,46 +118,52 @@ export function JoinForm({ code }: { code: string }) {
         id: Math.random().toString(36).substring(2, 9),
         name: data.name,
         email: data.email,
+        giftHints: data.giftHints,
       };
 
       console.log('Novo participante:', newParticipant);
 
       // Adiciona o participante ao grupo
       group.participants.push(newParticipant);
-      groups[groupIndex] = group;
+      allGroups[groupIndex] = group;
 
       console.log('Grupo após adicionar participante:', group);
-      console.log('Todos os grupos após atualização:', groups);
+      console.log('Todos os grupos após atualização:', allGroups);
 
       // Atualiza o localStorage
       try {
-        localStorage.setItem('groups', JSON.stringify(groups));
+        const userGroupsKey = getUserGroupsKey(user.id);
+        localStorage.setItem(userGroupsKey, JSON.stringify(allGroups));
         console.log('localStorage atualizado com sucesso');
         
         // Verifica se foi salvo corretamente
-        const verificacao = localStorage.getItem('groups');
+        const verificacao = localStorage.getItem(userGroupsKey);
         console.log('Verificação do localStorage após salvar:', verificacao);
         
         // Força uma atualização em todas as abas
         window.dispatchEvent(new StorageEvent('storage', {
-          key: 'groups',
-          newValue: JSON.stringify(groups),
+          key: userGroupsKey,
+          newValue: JSON.stringify(allGroups),
           url: window.location.href
         }));
         
         console.log('Evento storage disparado');
+        
+        // Adiciona um pequeno delay antes do redirecionamento para garantir que os dados foram salvos
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 1000);
+
+        toast({
+          title: "Participação confirmada!",
+          description: "Você foi adicionado ao grupo com sucesso. Redirecionando para o dashboard...",
+        });
       } catch (error) {
         console.error('Erro ao salvar no localStorage:', error);
-        throw new Error("Erro ao salvar as alterações");
+        throw new Error("Houve um problema ao salvar suas informações. Por favor, tente novamente. Se o problema persistir, verifique se seu navegador não está no modo privado ou se tem espaço suficiente no armazenamento local.");
       }
 
-      toast({
-        title: "Participação confirmada!",
-        description: "Você foi adicionado ao grupo com sucesso.",
-      });
-
       // Redireciona para o dashboard após sucesso
-      router.push("/dashboard");
     } catch (error) {
       console.error('Erro ao participar:', error);
       toast({
@@ -189,6 +220,18 @@ export function JoinForm({ code }: { code: string }) {
             />
             {errors.password && (
               <p className="text-sm text-red-500">{errors.password.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="giftHints">Dicas de presentes (opcional)</Label>
+            <Input
+              id="giftHints"
+              placeholder="Dicas de presentes que você gostaria de receber"
+              {...register("giftHints")}
+            />
+            {errors.giftHints && (
+              <p className="text-sm text-red-500">{errors.giftHints.message}</p>
             )}
           </div>
         </CardContent>
