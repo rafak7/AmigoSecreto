@@ -23,7 +23,7 @@ import { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Input as InputPrice } from "@/components/ui/input-currency";
+import { InputCurrency } from "@/components/ui/input-currency";
 
 const groupSchema = z.object({
   name: z.string().min(3, "O nome deve ter no mínimo 3 caracteres"),
@@ -153,7 +153,7 @@ export function CreateGroupModal({ open, onOpenChange, onCreateGroup }: CreateGr
                 name="priceRange"
                 control={control}
                 render={({ field }) => (
-                  <InputPrice
+                  <InputCurrency
                     id="priceRange"
                     placeholder="R$ 0,00"
                     name={field.name}
