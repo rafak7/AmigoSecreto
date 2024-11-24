@@ -14,6 +14,8 @@ import { Input } from "./ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2 } from "lucide-react";
 
 interface Participant {
   id: string;
@@ -50,26 +52,38 @@ export function InviteParticipantsModal({
   onUpdateGroup,
 }: InviteParticipantsModalProps) {
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("invite");
   const inviteLink = `${window.location.origin}/join/${group.inviteCode}`;
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copiado!",
-      description: "Link copiado para a área de transferência.",
-    });
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: "Copiado com sucesso! ",
+        description: "O link foi copiado para sua área de transferência.",
+        duration: 2000,
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao copiar",
+        description: "Não foi possível copiar o texto. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleStartDraw = () => {
+  const handleStartDraw = async () => {
     if (group.participants.length < 3) {
       toast({
-        title: "Participantes insuficientes",
-        description: "É necessário ter pelo menos 3 participantes para realizar o sorteio.",
+        title: "Participantes insuficientes ",
+        description: "São necessários pelo menos 3 participantes para realizar o sorteio.",
         variant: "destructive",
       });
       return;
     }
 
+    setIsLoading(true);
     try {
       // Cria uma cópia dos participantes para embaralhar
       let participants = [...group.participants];
@@ -150,10 +164,12 @@ export function InviteParticipantsModal({
     } catch (error) {
       console.error('Erro ao realizar sorteio:', error);
       toast({
-        title: "Erro ao realizar sorteio",
+        title: "Erro no sorteio ",
         description: error instanceof Error ? error.message : "Ocorreu um erro ao realizar o sorteio. Por favor, tente novamente.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -173,193 +189,215 @@ export function InviteParticipantsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <DialogHeader className="pb-2">
-          <DialogTitle className="text-lg">Gerenciar: {group.name}</DialogTitle>
-          <DialogDescription className="text-sm">
-            Compartilhe o link do grupo ou gerencie os participantes
-          </DialogDescription>
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <DialogTitle className="text-xl font-semibold">
+              {group.name}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Gerencie seu grupo de amigo secreto
+            </DialogDescription>
+          </motion.div>
         </DialogHeader>
 
-        <Tabs defaultValue="invite" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="mb-2">
-            <TabsTrigger value="invite" className="flex items-center gap-1 text-sm">
-              <LinkIcon className="h-3 w-3" />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="mb-4 p-1 bg-muted/50 backdrop-blur-sm">
+            <TabsTrigger 
+              value="invite" 
+              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
+            >
+              <LinkIcon className="h-4 w-4" />
               Convite
             </TabsTrigger>
-            <TabsTrigger value="participants" className="flex items-center gap-1 text-sm">
-              <Users className="h-3 w-3" />
-              Participantes
+            <TabsTrigger 
+              value="participants" 
+              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
+            >
+              <Users className="h-4 w-4" />
+              <span>Participantes ({group.participants.length})</span>
             </TabsTrigger>
             {group.drawResult && (
-              <TabsTrigger value="results" className="flex items-center gap-1 text-sm">
-                <Gift className="h-3 w-3" />
+              <TabsTrigger 
+                value="results" 
+                className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
+              >
+                <Gift className="h-4 w-4" />
                 Resultados
               </TabsTrigger>
             )}
           </TabsList>
 
-          <TabsContent value="invite" className="flex-1 mt-0">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div>
-                  <label className="text-xs font-medium mb-1 block">Link de convite</label>
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      readOnly
-                      value={inviteLink}
-                      className="h-8 text-sm"
-                    />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => copyToClipboard(inviteLink)}
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.2 }}
+              className="flex-1"
+            >
+              <TabsContent value="invite" className="flex-1 mt-0 space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Link de convite</label>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        readOnly
+                        value={inviteLink}
+                        className="h-10 text-sm bg-muted/50"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 hover:bg-primary hover:text-primary-foreground transition-colors duration-200"
+                        onClick={() => copyToClipboard(inviteLink)}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Compartilhe este link com os participantes que você deseja convidar
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Senha do grupo</label>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        readOnly
+                        value={group.invitePassword}
+                        className="h-10 text-sm bg-muted/50 font-mono"
+                        type="password"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 hover:bg-primary hover:text-primary-foreground transition-colors duration-200"
+                        onClick={() => copyToClipboard(group.invitePassword)}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Os participantes precisarão desta senha para entrar no grupo
+                    </p>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Compartilhe este link com as pessoas que você quer convidar.
-                </p>
-              </div>
+              </TabsContent>
 
-              <div className="space-y-2">
-                <div>
-                  <label className="text-xs font-medium mb-1 block">Senha do grupo</label>
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      readOnly
-                      value={group.invitePassword}
-                      className="h-8 text-sm"
-                    />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => copyToClipboard(group.invitePassword)}
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Os participantes precisarão desta senha para entrar.
-                </p>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="participants" className="flex-1 mt-0 overflow-hidden">
-            <ScrollArea className="h-[300px] pr-4">
-              <div className="space-y-2">
-                {group.participants.map((participant) => (
-                  <div
-                    key={participant.id}
-                    className="flex flex-col p-2 rounded-md bg-secondary"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 min-w-0">
+              <TabsContent value="participants" className="mt-0 flex-1">
+                <ScrollArea className="h-[400px] pr-4">
+                  <div className="space-y-4">
+                    {group.participants.map((participant) => (
+                      <motion.div
+                        key={participant.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-muted/50 p-4 rounded-lg space-y-2"
+                      >
                         <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">{participant.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {participant.email}
-                            </p>
+                          <div className="flex items-center gap-3">
+                            <div className="bg-primary/10 p-2 rounded-full">
+                              <Users className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                              <h4 className="font-medium">{participant.name}</h4>
+                              <p className="text-sm text-muted-foreground">{participant.email}</p>
+                            </div>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            className="h-6 w-6"
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8"
                             onClick={() => toggleParticipant(participant.id)}
                           >
                             {isParticipantExpanded(participant.id) ? (
-                              <ChevronUp className="h-3 w-3" />
+                              <ChevronUp className="h-4 w-4" />
                             ) : (
-                              <ChevronDown className="h-3 w-3" />
+                              <ChevronDown className="h-4 w-4" />
                             )}
                           </Button>
                         </div>
-                        {isParticipantExpanded(participant.id) && participant.giftHints && (
-                          <div className="flex gap-2 mt-1">
-                            <div className="h-4 w-0.5 bg-muted" />
-                            <p className="text-xs text-muted-foreground flex-1">
-                              <span className="font-medium">Dicas:</span> {participant.giftHints}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                        <AnimatePresence>
+                          {isParticipantExpanded(participant.id) && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="pt-2"
+                            >
+                              <div className="text-sm space-y-2">
+                                <p className="font-medium">Dicas de presente:</p>
+                                <p className="text-muted-foreground">
+                                  {participant.giftHints || "Nenhuma dica fornecida"}
+                                </p>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    ))}
                   </div>
-                ))}
-                {group.participants.length === 0 && (
-                  <div className="text-center py-6">
-                    <Users className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-xs text-muted-foreground">
-                      Nenhum participante ainda
-                    </p>
+                </ScrollArea>
+
+                {!group.drawResult && group.participants.length >= 3 && (
+                  <div className="mt-6 flex justify-center">
+                    <Button
+                      onClick={handleStartDraw}
+                      className="w-full sm:w-auto"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Realizando sorteio...
+                        </>
+                      ) : (
+                        <>
+                          <Gift className="mr-2 h-4 w-4" />
+                          Realizar Sorteio
+                        </>
+                      )}
+                    </Button>
                   </div>
                 )}
-              </div>
-            </ScrollArea>
-          </TabsContent>
+              </TabsContent>
 
-          {group.drawResult && (
-            <TabsContent value="results" className="flex-1 mt-0 overflow-hidden">
-              <ScrollArea className="h-[300px] pr-4">
-                <div className="space-y-2">
-                  {group.drawResult.map((pair, index) => (
-                    <div
-                      key={index}
-                      className="flex flex-col p-2 rounded-md bg-secondary"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 min-w-0">
+              {group.drawResult && (
+                <TabsContent value="results" className="mt-0">
+                  <ScrollArea className="h-[400px] pr-4">
+                    <div className="space-y-4">
+                      {group.drawResult.map((pair, index) => (
+                        <motion.div
+                          key={pair.giver.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className="bg-muted/50 p-4 rounded-lg"
+                        >
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1">
+                            <div>
                               <p className="text-sm font-medium">{pair.giver.name}</p>
-                              <span className="text-xs text-muted-foreground">tirou</span>
-                              <p className="text-sm font-medium text-red-500">{pair.receiver.name}</p>
+                              <p className="text-xs text-muted-foreground">presenteia</p>
+                              <p className="text-sm font-medium mt-1">{pair.receiver.name}</p>
                             </div>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => toggleParticipant(`draw-${index}`)}
-                            >
-                              {isParticipantExpanded(`draw-${index}`) ? (
-                                <ChevronUp className="h-3 w-3" />
-                              ) : (
-                                <ChevronDown className="h-3 w-3" />
-                              )}
-                            </Button>
+                            <Gift className="h-5 w-5 text-primary" />
                           </div>
-                          {isParticipantExpanded(`draw-${index}`) && pair.receiver.giftHints && (
-                            <div className="flex gap-2 mt-1">
-                              <div className="h-4 w-0.5 bg-muted" />
-                              <p className="text-xs text-muted-foreground flex-1">
-                                <span className="font-medium">Dicas:</span> {pair.receiver.giftHints}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                        </motion.div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-          )}
+                  </ScrollArea>
+                </TabsContent>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </Tabs>
-
-        <Button
-          className="w-full bg-red-500 hover:bg-red-600 h-8 text-sm mt-2"
-          onClick={handleStartDraw}
-          disabled={group.drawResult || group.participants.length < 3}
-        >
-          {group.drawResult ? "Sorteio já realizado" : "Realizar Sorteio"}
-        </Button>
       </DialogContent>
     </Dialog>
   );
